@@ -1,17 +1,8 @@
 /*
+* Copyright 2019-present Open Networking Foundation
 * Copyright (c) 2017 Sprint
 *
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*    http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
+* SPDX-License-Identifier: Apache-2.0
 */
 
 
@@ -71,6 +62,7 @@ std::string Options::m_synchauts;
 int         Options::m_numworkers;
 int         Options::m_concurrent;
 uint32_t    Options::m_statsfrequency;
+bool        Options::m_verify_roaming;
 
 void Options::help()
 {
@@ -289,6 +281,12 @@ bool Options::parseJson(){
          m_ossfile = hssSection["ossfile"].GetString();
          options |= ossfile;
       }
+      m_verify_roaming = false; /* disable by default */
+      if(hssSection.HasMember("verifyroamingsubscribers")){
+         if(!hssSection["verifyroamingsubscribers"].IsBool()) { std::cout << "Error parsing json value: [verifyroamingsubscribers]" << std::endl; return false; }
+         m_verify_roaming = hssSection["verifyroamingsubscribers"].GetBool();
+      }
+ 
    }
 
    return true;
@@ -446,7 +444,8 @@ bool Options::parseInputOptions( int argc, char **argv )
    return result;
 }
 
-void Options::fillhssconfig(hss_config_t *hss_config_p){
+void Options::fillhssconfig(hss_config_t *hss_config_p) 
+{
 
    hss_config_p->cassandra_server      = strdup(m_cassserver.c_str());
    hss_config_p->cassandra_user        = strdup(m_cassuser.c_str());
@@ -481,5 +480,6 @@ void Options::fillhssconfig(hss_config_t *hss_config_p){
    else{
       hss_config_p->random = (char*)"false";
    }
+   hss_config_p->verify_roaming = m_verify_roaming;
 }
 

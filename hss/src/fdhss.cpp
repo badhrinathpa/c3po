@@ -1,17 +1,8 @@
 /*
+* Copyright 2019-present Open Networking Foundation
 * Copyright (c) 2017 Sprint
 *
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*    http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
+* SPDX-License-Identifier: Apache-2.0
 */
 
 #include <iostream>
@@ -141,7 +132,7 @@ bool FDHss::init(hss_config_t * hss_config_p){
       //init the casssandra object with the parsed object
 
       m_s6tapp = new s6t::Application(m_dbobj);
-      m_s6aapp = new s6as6d::Application(m_dbobj);
+      m_s6aapp = new s6as6d::Application(m_dbobj,hss_config_p->verify_roaming);
       m_s6capp = new s6c::Application(m_dbobj);
 
       // advertise support for the accounting application

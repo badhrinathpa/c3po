@@ -1,17 +1,8 @@
 /*
+* Copyright 2019-present Open Networking Foundation
 * Copyright (c) 2017 Sprint
 *
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*   http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
+* SPDX-License-Identifier: Apache-2.0
 */
 
 #include <string>
@@ -27,6 +18,7 @@
 #include "fdhss.h"
 #include "rapidjson/document.h"
 #include "statshss.h"
+#include "util.h"
 
 #include <iomanip>
 extern "C" {
@@ -138,7 +130,7 @@ void fdJsonError( const char *err )
 }
 
 // Member functions that customize the individual application
-Application::Application( DataAccess &dbobj )
+Application::Application( DataAccess &dbobj, bool verify_roaming)
    : ApplicationBase()
    , m_cmd_uplr( *this )
    //, m_cmd_calr( *this )
@@ -149,6 +141,7 @@ Application::Application( DataAccess &dbobj )
    //, m_cmd_rer( *this )
    , m_dbobj( dbobj )
 {
+   verify_roaming_access = verify_roaming;
    registerHandlers();
 }
 
@@ -353,6 +346,7 @@ void AUIRreq::processAnswer( FDMessageAnswer &ans )
 
 int AUIRcmd::process( FDMessageRequest *req )
 {
+    // add something here in AIR Processor
    AIRProcessor *p = new AIRProcessor(*req, m_app, m_app.getDict());
    fdHss.getWorkerQueue().addProcessor(p);
    fdHss.getWorkerQueue().startProcessor();
@@ -2096,7 +2090,7 @@ void AIRProcessor::phase1()
       m_ans.add( m_dict.avpResultCode(), ER_DIAMETER_INVALID_AVP_VALUE);
       m_ans.send();
       StatsHss::singleton().registerStatResult(stat_hss_air, 0, ER_DIAMETER_INVALID_AVP_VALUE);
-      m_nextphase = ULRSTATE_PHASEFINAL;
+      m_nextphase = AIRSTATE_PHASEFINAL;
       return;
    }
 
@@ -2112,7 +2106,7 @@ void AIRProcessor::phase1()
          m_ans.add( m_dict.avpResultCode(), ER_DIAMETER_INVALID_AVP_VALUE);
          m_ans.send();
          StatsHss::singleton().registerStatResult(stat_hss_air, 0, ER_DIAMETER_INVALID_AVP_VALUE);
-         m_nextphase = ULRSTATE_PHASEFINAL;
+         m_nextphase = AIRSTATE_PHASEFINAL;
          return;
       }
    }
@@ -2133,7 +2127,7 @@ void AIRProcessor::phase1()
          m_ans.add(er);
          m_ans.send();
          StatsHss::singleton().registerStatResult(stat_hss_air, VENDOR_3GPP, DIAMETER_ERROR_RAT_NOT_ALLOWED);
-         m_nextphase = ULRSTATE_PHASEFINAL;
+         m_nextphase = AIRSTATE_PHASEFINAL;
          return;
       }
 
@@ -2145,7 +2139,7 @@ void AIRProcessor::phase1()
          m_ans.add(er);
          m_ans.send();
          StatsHss::singleton().registerStatResult(stat_hss_air, VENDOR_3GPP, DIAMETER_ERROR_RAT_NOT_ALLOWED);
-         m_nextphase = ULRSTATE_PHASEFINAL;
+         m_nextphase = AIRSTATE_PHASEFINAL;
          return;
       }
    }
@@ -2154,7 +2148,8 @@ void AIRProcessor::phase1()
    {
       if(m_plmn_len == 3 )
       {
-         if (apply_access_restriction ((char*)m_imsi.c_str(), m_plmn_id) != 0)
+         if ((m_app.roaming_access_control() == true) && 
+            apply_access_restriction ((char*)m_imsi.c_str(), m_plmn_id) != 0)
          {
             FDAvp er ( m_dict.avpExperimentalResult() );
             er.add( m_dict.avpVendorId(),  VENDOR_3GPP);
@@ -2162,7 +2157,7 @@ void AIRProcessor::phase1()
             m_ans.add(er);
             m_ans.send();
             StatsHss::singleton().registerStatResult(stat_hss_air, VENDOR_3GPP, DIAMETER_ERROR_ROAMING_NOT_ALLOWED);
-            m_nextphase = ULRSTATE_PHASEFINAL;
+            m_nextphase = AIRSTATE_PHASEFINAL;
             return;
          }
       }
@@ -2171,7 +2166,7 @@ void AIRProcessor::phase1()
          m_ans.add( m_dict.avpResultCode(), ER_DIAMETER_INVALID_AVP_VALUE);
          m_ans.send();
          StatsHss::singleton().registerStatResult(stat_hss_air, 0, ER_DIAMETER_INVALID_AVP_VALUE);
-         m_nextphase = ULRSTATE_PHASEFINAL;
+         m_nextphase = AIRSTATE_PHASEFINAL;
          return;
       }
    }
@@ -2180,7 +2175,7 @@ void AIRProcessor::phase1()
       m_ans.add( m_dict.avpResultCode(), ER_DIAMETER_INVALID_AVP_VALUE);
       m_ans.send();
       StatsHss::singleton().registerStatResult(stat_hss_air, 0, ER_DIAMETER_INVALID_AVP_VALUE);
-      m_nextphase = ULRSTATE_PHASEFINAL;
+      m_nextphase = AIRSTATE_PHASEFINAL;
       return;
    }
 
@@ -2228,6 +2223,14 @@ void AIRProcessor::phase2()
 
         // save the new rand and sqn locally
         memcpy(m_sec.rand, m_vector[0].rand, sizeof(m_sec.rand));
+        /*increment sqn*/
+        SqnU64Union eu;
+
+        SQN_TO_U64(sqn, eu);
+
+        eu.u64 += 32;
+
+        U64_TO_SQN(eu,sqn);
         memcpy(m_sec.sqn, sqn, sizeof(m_sec.sqn));
 
         free (sqn);
